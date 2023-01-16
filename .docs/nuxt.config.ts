@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   app: {
-    baseUrl: process.env.NODE_ENV === "production" ? "/ArmoniK.Api/" : "",
+    baseUrl: process.env.NODE_ENV === "production" ? "/proto-doc/" : "",
   },
 
   extends: "@nuxt-themes/docus",
