@@ -49,6 +49,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
         # This will be used to avoid the use of the docker image to generate the documentation if the proto files have not changed
       - name: Cache Proto
         id: proto-cache
@@ -64,7 +69,13 @@ jobs:
           image: pseudomuto/protoc-gen-doc
           options: -v ${{ github.workspace }}/.docs/content/api-proto:/out -v ${{ github.workspace }}/Protos/V1:/protos
           run: |
-            protoc -I/usr/include -Iprotos --doc_out=/out --doc_opt=markdown,index.md protos/*.proto
+            protoc -I/usr/include -Iprotos --doc_out=/out --doc_opt=markdown,tmp.md protos/*.proto
+
+      - name: Remove Toc
+        run: node ./scripts/remove-useless-md.js .docs/content/api-proto/tmp.md .docs/content/api-proto/index.md
+
+      - name: Remove tmp.md
+        run: rm .docs/content/api-proto/tmp.md
 
   build-docs:
     name: Build Docs
