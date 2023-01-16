@@ -73,7 +73,7 @@ jobs:
 
       - name: Remove Toc
         if: steps.proto-cache.outputs.cache-hit != 'true'
-        run: node ./scripts/remove-useless-md.js .docs/content/api-proto/tmp.md .docs/content/api-proto/index.md
+        run: node ./scripts/remove-useless-md.mjs .docs/content/api-proto/tmp.md .docs/content/api-proto/index.md
 
       - name: Remove tmp.md
         if: steps.proto-cache.outputs.cache-hit != 'true'
