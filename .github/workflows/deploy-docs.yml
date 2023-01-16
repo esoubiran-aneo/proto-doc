@@ -103,7 +103,7 @@ jobs:
         run: echo "NODE_ENV=production" >> $GITHUB_ENV
 
       - name: Static HTML export with Nuxt
-        run: npm run generate
+        run: cd ./docs && npm run generate
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
