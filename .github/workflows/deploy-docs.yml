@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ./docs/node_modules
-          key: node-modules-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ hashFiles('./docs/package-lock.json') }}
 
       - name: Install dependencies
         if: steps.node-cache.outputs.cache-hit != 'true'
@@ -103,7 +103,7 @@ jobs:
         run: echo "NODE_ENV=production" >> $GITHUB_ENV
 
       - name: Static HTML export with Nuxt
-        run: cd ./docs && npm run generate
+        run: cd .docs && npm run generate
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
