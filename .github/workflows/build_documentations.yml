@@ -1,46 +1,124 @@
-name: Build & Deploy Documentation
+name: Deploy Docs to Pages
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build-deploy-documentation:
-    runs-on: ubuntu-20.04
-
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+  generate-proto-docs:
+    name: Generate Proto Docs
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+        # This will be used to avoid the use of the docker image to generate the documentation if the proto files have not changed
+      - name: Cache Proto
+        id: proto-cache
+        uses: actions/cache@v3
+        with:
+          path: .docs/content/api-proto/*.md
+          key: proto-${{ hashFiles('Protos/**.proto') }}
+
       - name: Generate protobuf documentation
+        if: steps.proto-cache.outputs.cache-hit != 'true'
         uses: addnab/docker-run-action@v3
         with:
           image: pseudomuto/protoc-gen-doc
-          options: -v ${{ github.workspace }}/Documentation/api-protocol:/out -v ${{ github.workspace }}/Protos/V1:/protos
+          options: -v ${{ github.workspace }}/.docs/content/api-proto:/out -v ${{ github.workspace }}/Protos/V1:/protos
           run: |
             protoc -I/usr/include -Iprotos --doc_out=/out --doc_opt=markdown,index.md protos/*.proto
 
-      - name: Get mono
-        run: |
-          sudo apt-get -y install gnupg ca-certificates
-          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF        echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
-          echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
-          sudo apt-get update
-          sudo apt -y dist-upgrade
-          sudo apt -y install mono-runtime mono-devel msbuild
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [setup, generate-proto-docs]
+    defaults:
+      run:
+        working-directory: ./docs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: Get docfx
-        run: |
-          curl -L https://github.com/dotnet/docfx/releases/latest/download/docfx.zip -o docfx.zip
-          unzip -d $HOME/.docfx docfx.zip
-
-      - name: Build
-        run: |
-          mono $HOME/.docfx/docfx.exe Documentation/docfx.json build
-
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+      # Restore API proto documentation
+      - name: Cache Proto
+        id: proto-cache
+        uses: actions/cache@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: Documentation/_site
+          path: .docs/content/api-proto/*.md
+          key: proto-${{ hashFiles('Protos/**.proto') }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Cache Node Modules
+        id: node-cache
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Use NODE_ENV=production
+        run: echo "NODE_ENV=production" >> $GITHUB_ENV
+
+      - name: Static HTML export with Nuxt
+        run: npm run generate
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: .docs/.output/public
+
+  deploy:
+    name: Deploy to GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: [setup, generate-proto-docs, build]
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
