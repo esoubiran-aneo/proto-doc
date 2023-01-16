@@ -93,8 +93,8 @@ jobs:
         id: node-cache
         uses: actions/cache@v3
         with:
-          path: node_modules
-          key: node-modules-${{ hashFiles('package-lock.json') }}
+          path: .docs/node_modules
+          key: node-modules-${{ hashFiles('.docs/package-lock.json') }}
 
       - name: Use NODE_ENV=production
         run: echo "NODE_ENV=production" >> $GITHUB_ENV
